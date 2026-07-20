@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# Run this on an x86_64 (Intel/AMD) Linux machine - your PC, a spare box, or a
+# cheap throwaway x86 cloud VM. It downloads/updates the Project Zomboid
+# dedicated server files using SteamCMD natively (no ARM emulation needed
+# here at all). You then transfer the resulting folder to your ARM server
+# with the rsync command this script prints at the end.
+#
+set -euo pipefail
+trap 'echo "ERROR: script failed at line $LINENO (exit code $?)" >&2' ERR
+
+if [[ $EUID -eq 0 ]]; then
+    echo "Please run this script as a normal user with sudo privileges, not as root." >&2
+    exit 1
+fi
+
+if ! sudo -v; then
+    echo "This script requires sudo privileges." >&2
+    exit 1
+fi
+
+if [[ "$(uname -m)" != "x86_64" ]]; then
+    echo "ERROR: this script is meant to run on an x86_64 machine (found: $(uname -m))." >&2
+    echo "Use it on your PC, a spare box, or a throwaway x86 cloud VM - not the ARM server itself." >&2
+    exit 1
+fi
+
+cd "$HOME"
+
+# --- Wait for any other apt/dpkg process to release its lock -----------
+wait_for_apt_lock() {
+    local waited=0
+    while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        if [[ $waited -eq 0 ]]; then
+            echo "Another apt/dpkg process is running (likely unattended-upgrades) - waiting for it to finish..."
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [[ $waited -ge 300 ]]; then
+            echo "ERROR: apt lock still held after 5 minutes. Check 'ps aux | grep apt' manually." >&2
+            exit 1
+        fi
+    done
+}
+
+# --- Install SteamCMD's dependencies ------------------------------------
+# SteamCMD ships as a 32-bit (i386) binary even on x86_64 systems, so we
+# need the i386 architecture enabled and its 32-bit runtime libraries.
+echo "==> Installing SteamCMD dependencies..."
+wait_for_apt_lock
+sudo dpkg --add-architecture i386
+wait_for_apt_lock
+sudo apt update
+wait_for_apt_lock
+sudo apt install -y curl lib32gcc-s1 lib32stdc++6
+
+# --- Download and self-update SteamCMD ----------------------------------
+echo "==> Setting up SteamCMD..."
+mkdir -p steamcmd
+cd steamcmd
+if [[ ! -f steamcmd.sh ]]; then
+    curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf -
+fi
+./steamcmd.sh +quit > /dev/null
+
+# --- Download the Project Zomboid dedicated server ----------------------
+OUTPUT_DIR="$HOME/zomboid-server-files"
+mkdir -p "$OUTPUT_DIR"
+
+read -r -p "Do you want to run a beta branch? (y/n) otherwise, current release will be used: " use_beta
+if [[ "$use_beta" =~ ^[Yy]$ ]]; then
+    read -r -p 'Please specify the version (i.e. 42.13.3), otherwise "unstable" will be used: ' beta_version
+    beta_version=${beta_version:-unstable}
+    echo "installing beta $beta_version"
+    if ! ./steamcmd.sh +force_install_dir "$OUTPUT_DIR" +@sSteamCmdForcePlatformType linux \
+        +login anonymous +app_update 380870 -beta "$beta_version" validate +quit; then
+        echo "ERROR: steamcmd failed to install the beta branch." >&2
+        exit 1
+    fi
+else
+    echo "installing current release"
+    if ! ./steamcmd.sh +force_install_dir "$OUTPUT_DIR" +@sSteamCmdForcePlatformType linux \
+        +login anonymous +app_update 380870 validate +quit; then
+        echo "ERROR: steamcmd failed to install the current release." >&2
+        exit 1
+    fi
+fi
+
+if [[ ! -f "$OUTPUT_DIR/linux64/steamclient.so" ]]; then
+    echo "ERROR: expected server files not found in $OUTPUT_DIR - install may have failed." >&2
+    exit 1
+fi
+
+echo ""
+echo "=================================================================="
+echo "Download complete: $OUTPUT_DIR"
+echo ""
+echo "Next step: transfer these files to your ARM server. From this"
+echo "machine, run (replace user@arm-host with your actual login):"
+echo ""
+echo "  rsync -avz --progress $OUTPUT_DIR/ user@arm-host:/opt/zomboid-server/"
+echo ""
+echo "Once the transfer finishes, go to your ARM server and run"
+echo "02-setup-server-arm.sh (or rerun it if you already ran it once)."
+echo "=================================================================="

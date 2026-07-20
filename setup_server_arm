@@ -1,0 +1,150 @@
+#!/bin/bash
+#
+# Run this on your ARM server (e.g. Oracle Ampere instance). It builds Box64
+# (used to run the 64-bit Java server binary under emulation), opens the
+# firewall, and sets up the Project Zomboid server as a systemd service.
+#
+# IMPORTANT: this script does NOT download the server files itself. Run
+# 01-download-server-x86.sh on a separate x86_64 machine first, then rsync
+# the resulting folder into /opt/zomboid-server on this machine. See the
+# README for the full step-by-step flow.
+#
+set -euo pipefail
+trap 'echo "ERROR: script failed at line $LINENO (exit code $?)" >&2' ERR
+
+if [[ $EUID -eq 0 ]]; then
+    echo "Please run this script as a normal user with sudo privileges, not as root." >&2
+    exit 1
+fi
+
+if ! sudo -v; then
+    echo "This script requires sudo privileges." >&2
+    exit 1
+fi
+
+cd "$HOME"
+
+# --- Wait for any other apt/dpkg process to release its lock -----------
+# Fresh/cloud Ubuntu 24.04 images run unattended-upgrades aggressively
+# right after boot, which commonly collides with this script's apt calls.
+wait_for_apt_lock() {
+    local waited=0
+    while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+        if [[ $waited -eq 0 ]]; then
+            echo "Another apt/dpkg process is running (likely unattended-upgrades) - waiting for it to finish..."
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [[ $waited -ge 300 ]]; then
+            echo "ERROR: apt lock still held after 5 minutes. Check 'ps aux | grep apt' manually." >&2
+            exit 1
+        fi
+    done
+}
+
+# --- Install build dependencies -----------------------------------------
+echo "==> Updating system and installing base packages..."
+wait_for_apt_lock
+sudo apt update
+wait_for_apt_lock
+sudo apt full-upgrade -y
+wait_for_apt_lock
+sudo apt install -y git build-essential cmake openjdk-21-jdk
+
+# --- Open firewall ports and reload the fw ------------------------------
+echo "==> Configuring firewall..."
+sudo ufw allow 16261/udp
+sudo ufw allow 16262/udp
+sudo ufw reload
+
+# --- Clone and build Box64 (emulation for the Java server binary) -------
+echo "==> Building Box64..."
+if [[ -d box64 ]]; then
+    echo "box64/ already exists, pulling latest instead of re-cloning."
+    git -C box64 pull
+else
+    git clone https://github.com/ptitSeb/box64.git
+fi
+mkdir -p box64/build
+pushd box64/build > /dev/null
+# NOTE: -DARM_DYNAREC=ON is the correct generic flag for ARM64 hosts.
+# Flags like -DRPI4ARM64=1 are specific to Raspberry Pi boards and don't
+# apply to a general ARM64 machine like an Ampere cloud instance.
+cmake .. -DARM_DYNAREC=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+make -j"$(nproc)"
+sudo make install
+popd > /dev/null
+sudo systemctl restart systemd-binfmt
+cd "$HOME"
+
+if ! command -v box64 >/dev/null 2>&1; then
+    echo "ERROR: box64 did not install correctly (not found on PATH)." >&2
+    exit 1
+fi
+
+# --- Prepare the server directory ----------------------------------------
+sudo mkdir -p /opt/zomboid-server
+sudo chown "$(whoami)":"$(whoami)" /opt/zomboid-server
+
+# --- Wait for the server files to be transferred from the x86 machine ---
+if [[ ! -f /opt/zomboid-server/linux64/steamclient.so ]]; then
+    echo ""
+    echo "=================================================================="
+    echo "Server files not found in /opt/zomboid-server yet."
+    echo ""
+    echo "On your x86_64 machine, run 01-download-server-x86.sh, then"
+    echo "transfer the files here with (run this FROM the x86 machine):"
+    echo ""
+    echo "  rsync -avz --progress ~/zomboid-server-files/ $(whoami)@$(hostname -I | awk '{print $1}'):/opt/zomboid-server/"
+    echo ""
+    echo "Once the transfer finishes, rerun this script - it will pick up"
+    echo "right where it left off."
+    echo "=================================================================="
+    exit 0
+fi
+
+echo "==> Server files found - continuing setup."
+
+# --- Prompt user for manual config ---------------------------------------
+read -r -p "Please, without interrupting this script, start the server manually in another terminal (see README) and set the password. Press Enter when that's done..."
+
+# --- Fix up some dependencies and paths for server files ------------------
+echo "==> Fixing up symlinks..."
+ln -sf /opt/zomboid-server/linux64/steamclient.so /opt/zomboid-server/linux64/libsteam.so
+
+if [[ -d "$HOME/Zomboid" ]]; then
+    for item in "$HOME"/Zomboid/*; do
+        ln -sf "$item" /opt/zomboid-server/
+    done
+else
+    echo "WARNING: $HOME/Zomboid not found yet - did you complete the manual server start above?" >&2
+fi
+
+# --- Set up zomboid as a systemd service -----------------------------------
+echo "==> Installing systemd service..."
+sudo tee /etc/systemd/system/zomboid-server.service > /dev/null <<EOL
+[Unit]
+Description=Project Zomboid Server
+After=network.target
+
+[Service]
+User=$(whoami)
+WorkingDirectory=/opt/zomboid-server/
+# IMPORTANT: force data directory + prevent LD_PRELOAD issues
+Environment="LD_LIBRARY_PATH=/opt/zomboid-server/linux64:/opt/zomboid-server/natives:/opt/zomboid-server/jre64/lib:."
+Environment="BOX64_JVM=1"
+Environment="BOX64_DYNAREC_BIGBLOCK=0"
+Environment="BOX64_DYNAREC_STRONGMEM=1"
+ExecStart=/usr/local/bin/box64 /opt/zomboid-server/jre64/bin/java -Djava.awt.headless=true -Xms4g -Xmx16g -XX:ActiveProcessorCount=4 -Dzomboid.steam=1 -Dzomboid.znetlog=1 -Djava.library.path=linux64/:natives/ -Djava.security.egd=file:/dev/urandom -XX:+UseSerialGC -XX:-UseCompressedOops -XX:TieredStopAtLevel=1 -cp "java/:java/projectzomboid.jar" zombie.network.GameServer
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+sudo systemctl daemon-reload
+sudo systemctl enable zomboid-server
+sudo systemctl start zomboid-server
+
+echo "==> Done. Check status with: sudo systemctl status zomboid-server"
