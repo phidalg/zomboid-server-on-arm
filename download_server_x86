@@ -47,8 +47,9 @@ wait_for_apt_lock() {
 # SteamCMD ships as a 32-bit (i386) binary even on x86_64 systems, so we
 # need the i386 architecture enabled and its 32-bit runtime libraries.
 echo "==> Installing SteamCMD dependencies..."
-wait_for_apt_lock
-sudo dpkg --add-architecture i386
+if ! dpkg --print-foreign-architectures | grep -qx 'i386'; then
+    sudo dpkg --add-architecture i386
+fi
 wait_for_apt_lock
 sudo apt update
 wait_for_apt_lock
