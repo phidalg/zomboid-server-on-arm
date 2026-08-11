@@ -3,7 +3,8 @@
 [![Follow me](https://img.shields.io/github/followers/juanbravozu?style=social)](https://github.com/juanbravozu)
 [![License](https://img.shields.io/github/license/juanbravozu/zomboid-server-on-arm)](https://github.com/juanbravozu/zomboid-server-on-arm/blob/main/LICENSE)
 
-> Forked from [Dyarven/Zomboid-Server-on-ARM](https://github.com/Dyarven/Zomboid-Server-on-ARM). See [What's different in this fork](#whats-different-in-this-fork) below.
+> Forked from [juanbravozu/zomboid-server-on-arm](https://github.com/juanbravozu/zomboid-server-on-arm). See [What's different in this fork](#whats-different-in-this-fork) below.  
+> juanbravozu/zomboid-server-on-arm is a fork from [Dyarven/zomboid-server-on-arm](https://github.com/Dyarven/zomboid-server-on-arm)
 
 A pair of bash scripts to ease the set up of a **Project Zomboid server** on ARM64 devices like Raspberry Pi or OCI Ampere Arm-based cloud instances using an emulation layer.
 
