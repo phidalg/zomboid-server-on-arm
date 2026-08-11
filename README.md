@@ -1,7 +1,7 @@
 # 🧟‍♂️ Zomboid Server on ARM
-[![Star this repo](https://img.shields.io/github/stars/juanbravozu/zomboid-server-on-arm?style=social)](https://github.com/juanbravozu/zomboid-server-on-arm/stargazers)
-[![Follow me](https://img.shields.io/github/followers/juanbravozu?style=social)](https://github.com/juanbravozu)
-[![License](https://img.shields.io/github/license/juanbravozu/zomboid-server-on-arm)](https://github.com/juanbravozu/zomboid-server-on-arm/blob/main/LICENSE)
+[![Star this repo](https://img.shields.io/github/stars/phidalg/zomboid-server-on-arm?style=social)](https://github.com/phidalg/zomboid-server-on-arm/stargazers)
+[![Follow me](https://img.shields.io/github/followers/phidalg?style=social)](https://github.com/phidalg)
+[![License](https://img.shields.io/github/license/phidalg/zomboid-server-on-arm)](https://github.com/phidalg/zomboid-server-on-arm/blob/main/LICENSE)
 
 > Forked from [juanbravozu/zomboid-server-on-arm](https://github.com/juanbravozu/zomboid-server-on-arm). See [What's different in this fork](#whats-different-in-this-fork) below.  
 > juanbravozu/zomboid-server-on-arm is a fork from [Dyarven/zomboid-server-on-arm](https://github.com/Dyarven/zomboid-server-on-arm)
