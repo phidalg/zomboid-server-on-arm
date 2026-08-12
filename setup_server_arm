@@ -47,8 +47,6 @@ echo "==> Updating system and installing base packages..."
 wait_for_apt_lock
 sudo apt update
 wait_for_apt_lock
-sudo apt full-upgrade -y
-wait_for_apt_lock
 sudo apt install -y git build-essential cmake openjdk-21-jdk
 
 # --- Open firewall ports and reload the fw ------------------------------
