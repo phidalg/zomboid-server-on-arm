@@ -49,6 +49,19 @@ sudo apt update
 wait_for_apt_lock
 sudo apt install -y git build-essential cmake openjdk-21-jdk
 
+# --- Check UFW -----------------------------------------------------------
+if ! command -v ufw >/dev/null 2>&1; then
+    echo "ERROR: UFW is not installed."
+    echo
+    echo "Please install UFW before running this script:"
+    echo "  sudo apt update"
+    echo "  sudo apt install ufw"
+    echo
+    echo "WARNING: If you are connected to this VM via SSH,"
+    echo "make sure SSH access is allowed before enabling UFW."
+    exit 1
+fi
+
 # --- Open firewall ports and reload the fw ------------------------------
 echo "==> Configuring firewall..."
 sudo ufw allow 16261/udp
