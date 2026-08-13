@@ -64,6 +64,7 @@ fi
 
 # --- Open firewall ports and reload the fw ------------------------------
 echo "==> Configuring firewall..."
+sudo ufw allow 22/tcp
 sudo ufw allow 16261/udp
 sudo ufw allow 16262/udp
 
