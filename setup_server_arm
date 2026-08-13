@@ -69,18 +69,17 @@ sudo ufw allow 16261/udp
 sudo ufw allow 16262/udp
 
 # --- Clone and build Box64 (emulation for the Java server binary) -------
-echo "==> Building Box64..."
+BOX64_REF="v0.4.4" # Change this to use a newer version of Box64 when it's available.
+echo "==> Building Box64 ($BOX64_REF)..."
 if [[ -d box64 ]]; then
-    echo "box64/ already exists, pulling latest instead of re-cloning."
-    git -C box64 pull
+    echo "box64/ already exists - fetching and checking out $BOX64_REF."
+    git -C box64 fetch --tags
+    git -C box64 checkout "$BOX64_REF"
 else
-    git clone https://github.com/ptitSeb/box64.git
+    git clone --branch "$BOX64_REF" --depth 1 https://github.com/ptitSeb/box64.git
 fi
 mkdir -p box64/build
 pushd box64/build > /dev/null
-# NOTE: -DARM_DYNAREC=ON is the correct generic flag for ARM64 hosts.
-# Flags like -DRPI4ARM64=1 are specific to Raspberry Pi boards and don't
-# apply to a general ARM64 machine like an Ampere cloud instance.
 cmake .. -DARM_DYNAREC=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
 make -j"$(nproc)"
 sudo make install
