@@ -113,7 +113,7 @@ sudo mkdir -p /opt/zomboid-server
 sudo chown -R zomboiduser:zomboid /opt/zomboid-server
 sudo chmod 2770 /opt/zomboid-server
 sudo find /opt/zomboid-server -mindepth 1 -type d -exec chmod 2770 {} +
-sudo find /opt/zomboid-server -mindepth 1 -type f -exec chmod 0660 {} +
+sudo find /opt/zomboid-server -mindepth 1 -type f -exec chmod ug+rw,o-rwx {} +
 
 # --- Wait for the server files to be transferred from the x86 machine ---
 if [[ ! -f /opt/zomboid-server/linux64/steamclient.so ]]; then
