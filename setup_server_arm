@@ -92,9 +92,18 @@ if ! command -v box64 >/dev/null 2>&1; then
     exit 1
 fi
 
+# --- Create the dedicated service account --------------------------------
+if ! id zomboiduser &>/dev/null; then
+    echo "==> Creating zomboiduser system account..."
+    sudo useradd --system --no-create-home --home-dir /opt/zomboid-server \
+        --shell /usr/sbin/nologin zomboiduser
+else
+    echo "==> zomboiduser already exists - skipping creation."
+fi
+
 # --- Prepare the server directory ----------------------------------------
 sudo mkdir -p /opt/zomboid-server
-sudo chown "$(whoami)":"$(whoami)" /opt/zomboid-server
+sudo chown zomboiduser:zomboiduser /opt/zomboid-server
 
 # --- Wait for the server files to be transferred from the x86 machine ---
 if [[ ! -f /opt/zomboid-server/linux64/steamclient.so ]]; then
