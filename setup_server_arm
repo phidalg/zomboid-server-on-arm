@@ -8,7 +8,13 @@
 # 01-download-server-x86.sh on a separate x86_64 machine first, then rsync
 # the resulting folder into /opt/zomboid-server on this machine. See the
 # README for the full step-by-step flow.
-#
+
+# --- Config: your Oracle Cloud static public IP and SSH-capable user ----
+
+PUBLIC_IP="<your-static-public-ip>"
+SSH_USER="$(whoami)"   # the account with SSH access - NOT zomboiduser
+
+
 set -euo pipefail
 trap 'echo "ERROR: script failed at line $LINENO (exit code $?)" >&2' ERR
 
@@ -92,20 +98,32 @@ if ! command -v box64 >/dev/null 2>&1; then
     exit 1
 fi
 
-# --- Create the dedicated service account --------------------------------
+# --- Create the dedicated service account (idempotent) -------------------
+sudo groupadd -f zomboid
+
 if ! id zomboiduser &>/dev/null; then
     echo "==> Creating zomboiduser system account..."
     sudo useradd --system --no-create-home --home-dir /opt/zomboid-server \
-        --shell /usr/sbin/nologin zomboiduser
+        --shell /usr/sbin/nologin --gid zomboid zomboiduser
 else
     echo "==> zomboiduser already exists - skipping creation."
 fi
 
+# Add your personal (SSH-login) user to the shared group too, so rsync
+# transfers from the x86 machine can land here without an ownership clash.
+sudo usermod -aG zomboid "$(whoami)"
+
 # --- Prepare the server directory ----------------------------------------
 sudo mkdir -p /opt/zomboid-server
-sudo chown zomboiduser:zomboiduser /opt/zomboid-server
+sudo chown zomboiduser:zomboid /opt/zomboid-server
+sudo chmod 2775 /opt/zomboid-server
 
-# --- Wait for the server files to be transferred from the x86 machine ---
+# --- Wait for the server files to be transferred from the x86 machine ----
+if [[ "$PUBLIC_IP" == "<your-static-public-ip>" ]]; then
+    echo "ERROR: Set PUBLIC_IP near the top of this script before running it." >&2
+    exit 1
+fi
+
 if [[ ! -f /opt/zomboid-server/linux64/steamclient.so ]]; then
     echo ""
     echo "=================================================================="
@@ -114,7 +132,7 @@ if [[ ! -f /opt/zomboid-server/linux64/steamclient.so ]]; then
     echo "On your x86_64 machine, run 01-download-server-x86.sh, then"
     echo "transfer the files here with (run this FROM the x86 machine):"
     echo ""
-    echo "  rsync -avz --progress ~/zomboid-server-files/ $(whoami)@$(hostname -I | awk '{print $1}'):/opt/zomboid-server/"
+    echo "  rsync -avz --progress ~/zomboid-server-files/ ${SSH_USER}@${PUBLIC_IP}:/opt/zomboid-server/"
     echo ""
     echo "Once the transfer finishes, rerun this script - it will pick up"
     echo "right where it left off."
@@ -122,7 +140,9 @@ if [[ ! -f /opt/zomboid-server/linux64/steamclient.so ]]; then
     exit 0
 fi
 
-echo "==> Server files found - continuing setup."
+echo "==> Server files found - reclaiming ownership for zomboiduser..."
+sudo chown -R zomboiduser:zomboiduser /opt/zomboid-server
+echo "==> Continuing setup."
 
 # --- Prompt user for manual config ---------------------------------------
 read -r -p "Please, without interrupting this script, start the server manually in another terminal (see README) and set the password. Press Enter when that's done..."
