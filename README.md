@@ -84,12 +84,21 @@ This script is safe to run more than once - it's the same script for both "befor
 
 ### 5. When the script prompts you to, on another terminal (don't close the first one), run the server for the first time and set a password. When finished, shut it down and check that you correctly killed the process.
 
+The server must run as `zomboiduser` (the dedicated service account), not your own login user — and since `zomboiduser` has no login shell, use `sudo -u`, not `sudo -iu`:
+
 ```bash
+sudo -u zomboiduser bash -c '
 cd /opt/zomboid-server
-box64 jre64/bin/java -Djava.awt.headless=true -Xms4g -Xmx16g \
+box64 jre64/bin/java -Djava.awt.headless=true -Xms<SEE_BELOW>g -Xmx<SEE_BELOW>g \
+  -XX:ActiveProcessorCount=<YOUR_OCPU_COUNT> \
   -Dzomboid.steam=1 -Djava.library.path=linux64/:natives/ \
   -cp "java/:java/projectzomboid.jar" zombie.network.GameServer
+'
 ```
+
+**Don't copy the heap/CPU flags as-is** — size them to your actual instance. Rough starting point: `-Xmx` around 50–60% of total RAM (leaving room for the OS, Box64's own overhead, and some swap headroom), `-Xms` at half of `-Xmx` or less, `-XX:ActiveProcessorCount` set to your instance's OCPU count. Example for a 1 OCPU / 6GB instance: `-Xms1g -Xmx3g -XX:ActiveProcessorCount=1`.
+
+Whatever values you use here, use the *same* values in the systemd service's `ExecStart` later — this manual run and the long-running service should be configured identically.
 
 ### 6. Go back to the first terminal and finish running the script.
 
