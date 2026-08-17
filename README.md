@@ -87,7 +87,7 @@ This script is safe to run more than once - it's the same script for both "befor
 The server must run as `zomboiduser` (the dedicated service account), not your own login user — and since `zomboiduser` has no login shell, use `sudo -u`, not `sudo -iu`:
 
 ```bash
-sudo -u zomboiduser bash -c '
+sudo -u zomboiduser -H bash -c '
 cd /opt/zomboid-server
 box64 jre64/bin/java -Djava.awt.headless=true -Xms<SEE_BELOW>g -Xmx<SEE_BELOW>g \
   -XX:ActiveProcessorCount=<YOUR_OCPU_COUNT> \

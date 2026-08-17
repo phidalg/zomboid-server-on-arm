@@ -142,14 +142,6 @@ read -r -p "Please, without interrupting this script, start the server manually 
 echo "==> Fixing up symlinks..."
 ln -sf /opt/zomboid-server/linux64/steamclient.so /opt/zomboid-server/linux64/libsteam.so
 
-if [[ -d "$HOME/Zomboid" ]]; then
-    for item in "$HOME"/Zomboid/*; do
-        ln -sf "$item" /opt/zomboid-server/
-    done
-else
-    echo "WARNING: $HOME/Zomboid not found yet - did you complete the manual server start above?" >&2
-fi
-
 # --- Set up zomboid as a systemd service -----------------------------------
 echo "==> Installing systemd service..."
 sudo tee /etc/systemd/system/zomboid-server.service > /dev/null <<EOL
@@ -158,8 +150,10 @@ Description=Project Zomboid Server
 After=network.target
 
 [Service]
-User=$(whoami)
+User=zomboiduser
+Group=zomboid
 WorkingDirectory=/opt/zomboid-server/
+Environment="HOME=/opt/zomboid-server"
 # IMPORTANT: force data directory + prevent LD_PRELOAD issues
 Environment="LD_LIBRARY_PATH=/opt/zomboid-server/linux64:/opt/zomboid-server/natives:/opt/zomboid-server/jre64/lib:."
 Environment="BOX64_JVM=1"
