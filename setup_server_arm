@@ -57,7 +57,7 @@ echo "==> Updating system and installing base packages..."
 wait_for_apt_lock
 sudo apt update
 wait_for_apt_lock
-sudo apt install -y git build-essential cmake openjdk-21-jdk
+sudo apt install -y git build-essential cmake
 
 # --- Check UFW -----------------------------------------------------------
 if ! command -v ufw >/dev/null 2>&1; then
