@@ -22,6 +22,16 @@ if ! sudo -v; then
     exit 1
 fi
 
+# --- Load setup configuration file ---------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/server-setup.config"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "ERROR: config file not found at $CONFIG_FILE" >&2
+    echo "Copy/edit server-setup.config in the repo before running this script." >&2
+    exit 1
+fi
+source "$CONFIG_FILE"
+
 cd "$HOME"
 
 # --- Wait for any other apt/dpkg process to release its lock -----------
@@ -136,7 +146,22 @@ fi
 echo "==> Server files found - continuing setup."
 
 # --- Prompt user for manual config ---------------------------------------
-read -r -p "Please, without interrupting this script, start the server manually in another terminal (see README) and set the password. Press Enter when that's done..."
+cat <<EOF
+
+==================================================================
+Open another terminal (don't close this one) and run the server
+manually to set the admin password:
+
+  sudo -u zomboiduser bash -c '
+  cd /opt/zomboid-server
+  box64 jre64/bin/java -Djava.awt.headless=true -Duser.home=/opt/zomboid-server \\
+    -Xms${JAVA_XMS} -Xmx${JAVA_XMX} -XX:ActiveProcessorCount=${CPU_COUNT} \\
+    -Dzomboid.steam=1 -Djava.library.path=linux64/:natives/ \\
+    -cp "java/:java/projectzomboid.jar" zombie.network.GameServer
+  '
+==================================================================
+EOF
+read -r -p "Press Enter once you've set the password and shut the server down..."
 
 # --- Fix up some dependencies and paths for server files ------------------
 echo "==> Fixing up symlinks..."
@@ -159,7 +184,7 @@ Environment="LD_LIBRARY_PATH=/opt/zomboid-server/linux64:/opt/zomboid-server/nat
 Environment="BOX64_JVM=1"
 Environment="BOX64_DYNAREC_BIGBLOCK=0"
 Environment="BOX64_DYNAREC_STRONGMEM=1"
-ExecStart=/usr/local/bin/box64 /opt/zomboid-server/jre64/bin/java -Djava.awt.headless=true -Xms4g -Xmx16g -XX:ActiveProcessorCount=4 -Dzomboid.steam=1 -Dzomboid.znetlog=1 -Djava.library.path=linux64/:natives/ -Djava.security.egd=file:/dev/urandom -XX:+UseSerialGC -XX:-UseCompressedOops -XX:TieredStopAtLevel=1 -cp "java/:java/projectzomboid.jar" zombie.network.GameServer
+ExecStart=/usr/local/bin/box64 /opt/zomboid-server/jre64/bin/java -Djava.awt.headless=true -Xms${JAVA_XMS} -Xmx${JAVA_XMX} -XX:ActiveProcessorCount=${CPU_COUNT} -Dzomboid.steam=1 -Dzomboid.znetlog=1 -Djava.library.path=linux64/:natives/ -Djava.security.egd=file:/dev/urandom -XX:+UseSerialGC -XX:-UseCompressedOops -XX:TieredStopAtLevel=1 -cp "java/:java/projectzomboid.jar" zombie.network.GameServer
 Restart=always
 RestartSec=10
 
