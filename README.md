@@ -53,7 +53,7 @@ cd zomboid-server-on-arm
 
 ```bash
 chmod +x 01-download-server-x86.sh
-./01-download-server-x86.sh
+./download-server-x86.sh
 ```
 
 - Installs SteamCMD and its dependencies natively (no emulation).
